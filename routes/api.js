@@ -1,47 +1,64 @@
 const router = require('express').Router();
-const { request } = require('express');
-const Workout = require('../models/workout.js');
+const db = require("../models");
 
 // Find all Workouts
-router.get('/api/workouts', (request, response) => {
+router.get("/api/workouts", async (request, response) => {
     try {
-        Workout.find({})
-            .then(data => response.json(data))
+        const workoutData = await db.Workout.aggregate([
+            {
+                $addFields: {
+                    totalDuration: {
+                        $sum: '$exercises.duration'
+                    },
+                },
+            },
+        ]);
+        response.json(workoutData);
     } catch (error) {
-        console.log(error.message)
-    };
-})
-
+        response.status(500).send(error.message);
+    }
+});
 
 // Find Workouts by Range
-router.get('/api/workouts/range', (request, response) => {
+router.get('/api/workouts/range', async (request, response) => {
     try {
-        Workout.find({})
-            .then(data => response.json(data))
-    } catch (error) {
-        console.log(error.message)
-    };
-})
+        const workoutData = await db.Workout.aggregate([
+          {
+            $addFields: {
+              totalDuration: {
+                $sum: '$exercises.duration' 
+              },
+              totalWeight: {
+                $sum: '$exercises.weight'
+              }
+            },
+          },
+        ])
+          .limit(7);
+        response.json(workoutData);
+      } catch (error) {
+        response.status(500).send(error.message);
+      }
+    });
 
 // Update a Workout using Id
-router.put('/api/workouts/:id', (request, response) => {
+router.put('/api/workouts/:id', async (request, response) => {
     try {
-        Workout.findByIdAndUpdate(request.params.id, request.body)
-            .then(data => response.json(data))
+        const workoutData = await db.Workout.findByIdAndUpdate({ _id: request.params.id }, { $push: { exercises: request.body } })
+        response.json(workoutData)
     } catch (error) {
         response.status(500).json(error.message);
     }
-})
+});
 
 // Create a new Workout
-router.post('/api/workouts', ({ body }, response) => {
-    Workout.create(body)
-        .then((workoutData) => {
-            response.json(workoutData);
-        })
-        .catch((error) => {
-            response.status(500).json(error.message);
-        });
+router.post('/api/workouts', async ({ body }, response) => {
+    try {
+        const workoutData = await db.Workout.create(body);
+        response.json(workoutData);
+    } catch (error) {
+        response.status(500).send(error.message);
+    }
 });
 
 module.exports = router;
